@@ -218,7 +218,7 @@
             }
             
             const startNode = 0;
-            const endNode = params.numNodes - 1;
+            const endNode = Math.floor(params.numNodes / 2); // Place end node opposite to start
             
             // Draw nodes
             const nodeGeometry = new THREE.SphereGeometry(0.5, 16, 16);
