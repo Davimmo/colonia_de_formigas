@@ -21,10 +21,15 @@ PHEROMONE_EVAPORATION = 0.02
 ALPHA = 1.5
 BETA = 1.0
 
-EDGE_TRAVEL_TIME = 0.5
+EDGE_TRAVEL_TIME = 0.1
+
+ANT_SPEED_MULTIPLIER = 3.0   # <<< CONTROLE DE VELOCIDADE
+
 ANT_RADIUS = 5
 NODE_RADIUS = 8
-EDGE_WIDTH = 2
+
+EDGE_WIDTH_MIN = 1.0
+EDGE_WIDTH_MAX = 6.0
 
 ANTHILL = 0
 FOOD = 1
@@ -99,6 +104,7 @@ def choose_next(cur, visited, edges, dist):
             w = (pher ** ALPHA) * ((1 / dist[(i, j)]) ** BETA)
             options.append((j, w))
             total += w
+
     if not options:
         return None
 
@@ -119,6 +125,7 @@ def build_path(edges, dist):
             return None
         path.append(nxt)
         visited.add(nxt)
+
     return path + list(reversed(path[:-1]))
 
 
@@ -136,7 +143,10 @@ class Ant:
     def update(self, dt):
         if self.finished:
             return
-        self.t += dt / EDGE_TRAVEL_TIME
+
+        # >>> IMPLEMENTAÇÃO DA VELOCIDADE GLOBAL <<<
+        self.t += dt * ANT_SPEED_MULTIPLIER / EDGE_TRAVEL_TIME
+
         if self.t >= 1:
             self.t = 0
             self.edge += 1
@@ -159,12 +169,12 @@ def main():
     pygame.init()
     info = pygame.display.Info()
     w, h = info.current_w, info.current_h
+
     pygame.display.set_mode((w, h), DOUBLEBUF | OPENGL | FULLSCREEN)
 
     glMatrixMode(GL_PROJECTION)
     gluOrtho2D(0, w, 0, h)
     glMatrixMode(GL_MODELVIEW)
-    glLineWidth(EDGE_WIDTH)
 
     nodes, edges, dist = generate_graph(NUM_NODES, CONNECTIVITY, w, h)
 
@@ -180,34 +190,30 @@ def main():
             if e.type == KEYDOWN and e.key == K_ESCAPE:
                 running = False
 
-        # inicia nova iteração
         if not ants:
-            # evaporação
             for k in edges:
                 edges[k] *= (1 - PHEROMONE_EVAPORATION)
 
             ants = []
             paths = []
+
             for _ in range(NUM_ANTS):
                 p = build_path(edges, dist)
                 if p:
                     ants.append(Ant(p, nodes))
                     paths.append(p)
 
-            # deposição
             for p in paths:
                 for i in range(len(p)-1):
                     edges[(p[i], p[i+1])] += PHEROMONE_DEPOSIT
 
             iteration += 1
 
-        # atualizar formigas
         for ant in ants:
             ant.update(dt)
 
         ants = [a for a in ants if not a.finished]
 
-        # RENDER
         glClearColor(0.8, 0.8, 0.8, 1)
         glClear(GL_COLOR_BUFFER_BIT)
         glLoadIdentity()
@@ -217,13 +223,15 @@ def main():
         max_pher = max(edges.values())
         for (i, j), p in edges.items():
             t = min(p / max_pher, 1)
+            width = EDGE_WIDTH_MIN + t * (EDGE_WIDTH_MAX - EDGE_WIDTH_MIN)
+            glLineWidth(width)
             draw_line(nodes[i], nodes[j], (t, 0, 1 - t))
 
         for i, (x, y) in enumerate(nodes):
             if i == ANTHILL:
-                draw_circle(x, y, NODE_RADIUS+3, (1, 0, 0))
+                draw_circle(x, y, NODE_RADIUS + 3, (1, 0, 0))
             elif i == FOOD:
-                draw_circle(x, y, NODE_RADIUS+3, (0, 0, 1))
+                draw_circle(x, y, NODE_RADIUS + 3, (0, 0, 1))
             else:
                 draw_circle(x, y, NODE_RADIUS, (0, 0, 0))
 
